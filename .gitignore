@@ -32,3 +32,9 @@ Desktop.ini
 .pytest_cache/
 .coverage
 htmlcov/
+
+# 本地临时文件
+_tmp*
+
+# AI 改写语料（本地积累，勿提交）
+data/ai_rewrites.jsonl

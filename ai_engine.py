@@ -42,11 +42,24 @@ class AiConfig:
     # 混合模式下：短句默认不调 API，仅长句或随机抽样才调
     use_ai_chance: float = 0.12
     min_length_for_ai: int = 22
+    force_ai_on_send: bool = False
+    save_rewrites: bool = True
+    use_dataset_lookup: bool = True
+
+
+API_KEY_EMPTY_HINT = (
+    "API Key 为空：请在 config.json 的 ai.api_key 填写，"
+    "或设置环境变量 NEKOMIMI_API_KEY"
+)
 
 
 def resolve_api_key(config: AiConfig) -> str:
     """读取 API Key；勿将返回值写入日志。"""
     return (os.environ.get("NEKOMIMI_API_KEY") or config.api_key or "").strip()
+
+
+def has_api_key(config: AiConfig) -> bool:
+    return bool(resolve_api_key(config))
 
 
 def _chat_completions_url(base_url: str) -> str:
@@ -77,7 +90,7 @@ def _clean_ai_output(text: str, original: str) -> str:
 def transform_ai(text: str, config: AiConfig) -> str:
     api_key = resolve_api_key(config)
     if not api_key:
-        raise ValueError("未配置 API Key，请在 config.json 的 ai.api_key 填写，或设置环境变量 NEKOMIMI_API_KEY")
+        raise ValueError(API_KEY_EMPTY_HINT)
 
     system = config.system_prompt.strip() or DEFAULT_SYSTEM_PROMPT
     payload = {

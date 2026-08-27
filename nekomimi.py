@@ -77,6 +77,28 @@ def _rng(config: NekomimiConfig) -> random.Random:
     return random.Random(config.seed) if config.seed is not None else random
 
 
+# 纯笑声：不加主人，随机保留或改成猫娘笑
+_LAUGHTER_PATTERN = re.compile(
+    r"^(?:"
+    r"哈{2,}|呵{2,}|嘿{2,}|嘻{2,}|"
+    r"233+|"
+    r"[wW]{2,}|"
+    r"[hH]{2,}"
+    r")$",
+)
+_LAUGHTER_OUTPUTS = ("哈哈哈", "笑死我了喵", "笑死人家了喵")
+
+
+def try_transform_laughter(text: str, config: NekomimiConfig | None = None) -> str | None:
+    """纯「哈哈哈」类笑声 → 哈哈哈 / 笑死我了喵 / 笑死人家了喵。"""
+    stripped = text.strip()
+    if not _LAUGHTER_PATTERN.fullmatch(stripped):
+        return None
+    rng = _rng(config or NekomimiConfig())
+    trailing = text[len(text.rstrip()) :]
+    return rng.choice(_LAUGHTER_OUTPUTS) + trailing
+
+
 def _should_skip(text: str) -> bool:
     stripped = text.strip()
     if not stripped:
@@ -108,6 +130,22 @@ def _split_sentences(text: str) -> list[str]:
     return parts if parts else [text]
 
 
+# 「我知道/我想…」里的「我」不改成「人家」
+_PROTECTED_I_PHRASES = (
+    "我知道",
+    "我想",
+    "我要",
+    "我会",
+    "我是",
+    "我在",
+    "我来",
+    "我给",
+    "我能",
+    "我不",
+    "我自己",
+)
+
+
 def _apply_replacements(text: str, rules: list[WordReplacement], rng: random.Random) -> str:
     result = text
     sorted_rules = sorted(rules, key=lambda r: len(r.src), reverse=True)
@@ -116,6 +154,8 @@ def _apply_replacements(text: str, rules: list[WordReplacement], rng: random.Ran
             continue
         if rule.dst in result:
             continue
+        if rule.src == "我" and any(p in result for p in _PROTECTED_I_PHRASES):
+            continue
         if rng.random() > rule.chance:
             continue
         count = 1 if rule.once else -1
@@ -123,71 +163,84 @@ def _apply_replacements(text: str, rules: list[WordReplacement], rng: random.Ran
     return result
 
 
+# 应答/礼貌语后接逗号时，优先「好的主人，…」而非句尾「…，主人」
+_LEAD_PHRASES = ("没问题", "对不起", "谢谢", "你好", "好的", "可以", "行")
+
+
+def _try_insert_master_natural(text: str) -> str | None:
+    """在常见应答语后自然插入「主人」，匹配则返回新文本，否则 None。"""
+    if "主人" in text:
+        return None
+    for src in _LEAD_PHRASES:
+        idx = text.find(src)
+        if idx == -1:
+            continue
+        dst = src + "主人"
+        if dst in text:
+            continue
+        after = text[idx + len(src) :]
+        if not after:
+            return text.replace(src, dst, 1)
+        if after[0] in "，,、；;：:":
+            return text.replace(src, dst, 1)
+        # 「你好呀」等：短语后紧跟语气词，不用「你好主人呀」
+        if src == "你好" and after[0] in CUTE_ENDINGS:
+            return None
+    return None
+
+
+def _normalize_master_position(text: str) -> str:
+    """纠正「…，主人」语序（含短句「喜欢你，主人喵」）。"""
+    for src in _LEAD_PHRASES:
+        if not text.startswith(src):
+            continue
+        pos = text.rfind("，主人")
+        if pos <= len(src):
+            continue
+        middle = text[len(src) : pos]
+        if not middle.startswith("，"):
+            continue
+        suffix = text[pos + len("，主人") :]
+        return f"{src}主人{middle}{suffix}"
+
+    pos = text.rfind("，主人")
+    if pos <= 0:
+        return text
+    before = text[:pos]
+    after = text[pos + len("，主人") :]
+    if "主人" in before or "，" in before:
+        return text
+    return f"主人，{before}{after}"
+
+
+def _master_prefix(text: str, rng: random.Random) -> str:
+    return rng.choice(("主人，", "主人~")) + text
+
+
 def _insert_master(text: str, chance: float, rng: random.Random) -> str:
     if "主人" in text or rng.random() > chance:
         return text
 
-    mode = rng.choice(("prefix", "suffix", "after_phrase", "after_comma"))
+    natural = _try_insert_master_natural(text)
+    if natural is not None:
+        return natural
 
-    if mode == "prefix":
-        return rng.choice(("主人，", "主人~")) + text
+    # 无逗号短句一律句首「主人，」（避免「喜欢你，主人喵」）
+    if "，" not in text and "," not in text:
+        return _master_prefix(text, rng)
 
-    if mode == "suffix":
-        m = TRAILING_PUNCT.search(text)
-        if m:
-            punct = m.group(1)
-            core = text[: m.start()].rstrip("，,、")
-            return f"{core}，主人{punct}"
-        return text.rstrip("，,、") + "，主人"
-
-    if mode == "after_phrase":
-        phrases = (
-            ("好的", "好的主人"),
-            ("谢谢", "谢谢主人"),
-            ("你好", "你好主人"),
-            ("对不起", "对不起主人"),
-            ("没问题", "没问题主人"),
-        )
-        phrase_list = list(phrases)
-        rng.shuffle(phrase_list)
-        for src, dst in phrase_list:
-            idx = text.find(src)
-            if idx == -1 or dst in text:
-                continue
-            rest = text[idx + len(src) :].lstrip()
-            # 短语后还有正文（如「你好呀」）→ 用前缀，避免「你好主人呀」
-            if rest and rest[0] not in END_PUNCT and rest[0] not in "，,、；;：:":
-                return rng.choice(("主人，", "主人~")) + text
-            return text.replace(src, dst, 1)
-        m = TRAILING_PUNCT.search(text)
-        if m:
-            punct = m.group(1)
-            core = text[: m.start()].rstrip("，,、")
-            return f"{core}，主人{punct}"
-        return text.rstrip("，,、") + "，主人"
-
-    if mode == "after_comma":
-        for sep in ("，", ",", "、"):
-            idx = text.find(sep)
-            if idx != -1:
-                return text[: idx + len(sep)] + "主人" + text[idx + len(sep) :]
-        return rng.choice(("主人，", "主人~")) + text
-
-    return text
+    # 含逗号也优先句首，不再随机句尾
+    return _master_prefix(text, rng)
 
 
 def _ensure_master(text: str, rng: random.Random) -> str:
     """保证句中出现「主人」称呼（自然位置）。"""
     if "主人" in text:
         return text
-    if len(text) <= 10:
-        return rng.choice(("主人，", "主人~", "主人 ")) + text
-    m = TRAILING_PUNCT.search(text)
-    if m:
-        punct = m.group(1)
-        core = text[: m.start()].rstrip("，,、")
-        return f"{core}，主人{punct}"
-    return text.rstrip("，,、") + "，主人"
+    natural = _try_insert_master_natural(text)
+    if natural is not None:
+        return natural
+    return _master_prefix(text, rng)
 
 
 def _pick_suffix(config: NekomimiConfig, rng: random.Random) -> str:
@@ -195,12 +248,22 @@ def _pick_suffix(config: NekomimiConfig, rng: random.Random) -> str:
     return rng.choice(templates or list(DEFAULT_SUFFIXES))
 
 
+def _already_has_nya(clause: str) -> bool:
+    """句末已有「喵」或「～喵」类后缀时不再叠加。"""
+    core = clause.rstrip()
+    if not core:
+        return False
+    if core.endswith("喵"):
+        return True
+    return core.endswith(("～", "~")) and "喵" in core[-4:]
+
+
 def _append_nya_to_clause(clause: str, chance: float, config: NekomimiConfig, rng: random.Random) -> str:
     if rng.random() > chance:
         return clause
 
     core = clause.rstrip()
-    if not core or core.endswith(CUTE_ENDINGS):
+    if not core or _already_has_nya(core):
         return clause
 
     trailing_ws = clause[len(core) :]
@@ -229,6 +292,11 @@ def _append_nya(text: str, chance: float, per_sentence: float, config: NekomimiC
 
 
 def _cute_particles(text: str, chance: float, wave_chance: float, rng: random.Random) -> str:
+    core = text.rstrip()
+    # 句末已有「喵」时不再叠「呢」「～」，避免「喵呢！」
+    if core.endswith("喵") or core.endswith(("喵！", "喵～", "～喵")):
+        return text
+
     if rng.random() > chance:
         result = text
     else:
@@ -254,6 +322,30 @@ def _cute_particles(text: str, chance: float, wave_chance: float, rng: random.Ra
     return result
 
 
+# 常见短句：规则难做语义改写，用语料未命中时的兜底模板（含「喵」）
+_EXACT_PHRASE_VARIANTS: dict[str, tuple[str, ...]] = {
+    "你好": ("主人好呀喵～", "主人好喵～", "喵～主人好呀"),
+    "在吗": ("主人，在的喵～", "在呢主人喵", "人家在呢主人"),
+    "晚安": ("主人晚安喵～", "晚安主人喵～", "人家祝主人晚安喵"),
+    "早安": ("主人早呀喵～", "早呀主人喵～"),
+    "早上好": ("主人早呀喵～", "早呀主人喵～"),
+    "我喜欢你": ("人家最喜欢主人了喵～", "人家也最喜欢主人了喵～"),
+    "想你了": ("人家想主人了喵～", "想主人了喵～"),
+    "对不起": ("对不起主人喵～", "人家错了主人喵～"),
+    "谢谢": ("谢谢主人喵～", "多谢主人喵～"),
+}
+
+
+def _try_exact_phrase(text: str, rng: random.Random) -> str | None:
+    """整句命中常见口语时直接返回猫娘句式（跳过随机叠词规则）。"""
+    key = text.strip()
+    variants = _EXACT_PHRASE_VARIANTS.get(key)
+    if not variants:
+        return None
+    trailing = text[len(text.rstrip()) :]
+    return rng.choice(variants) + trailing
+
+
 def transform(text: str, config: NekomimiConfig | None = None) -> str:
     """将普通聊天文本转为猫娘风格。"""
     if config is None:
@@ -266,6 +358,10 @@ def transform(text: str, config: NekomimiConfig | None = None) -> str:
 
     original_trailing = text[len(text.rstrip()) :]
     body = text.rstrip()
+
+    exact = _try_exact_phrase(text, rng)
+    if exact is not None:
+        return exact
 
     # 标点触发模式：无标点时只做轻量替换，不加喵/主人
     punctuation_mode = config.mode == "punctuation"
@@ -289,26 +385,9 @@ def transform(text: str, config: NekomimiConfig | None = None) -> str:
     if config.enable_master and config.force_master:
         body = _ensure_master(body, rng)
 
+    if config.enable_master:
+        body = _normalize_master_position(body)
+
     return body + original_trailing
 
 
-def preview_samples_rules(config: NekomimiConfig | None = None) -> list[tuple[str, str]]:
-    """内置示例，便于在 CMD 里预览效果。"""
-    cfg = config or NekomimiConfig()
-    samples = ("你好", "今天天气不错", "好的没问题", "你在干嘛", "为什么呀")
-    fixed = NekomimiConfig(
-        mode=cfg.mode,
-        master_chance=cfg.master_chance,
-        nya_end_chance=cfg.nya_end_chance,
-        nya_per_sentence_chance=cfg.nya_per_sentence_chance,
-        cute_particle_chance=cfg.cute_particle_chance,
-        add_trailing_wave_chance=cfg.add_trailing_wave_chance,
-        suffix_templates=cfg.suffix_templates,
-        replacements=cfg.replacements,
-        enable_master=cfg.enable_master,
-        enable_nya=cfg.enable_nya,
-        enable_replacements=cfg.enable_replacements,
-        enable_particles=cfg.enable_particles,
-        seed=20260827,
-    )
-    return [(s, transform(s, fixed)) for s in samples]
