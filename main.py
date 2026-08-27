@@ -54,17 +54,17 @@ def log(msg: str) -> None:
 
 
 def _print_help() -> None:
-    print("窗口命令:")
-    print("  m      开关猫娘模式")
-    print("  t      预览剪贴板猫化效果")
-    print("  t 文本  预览指定文本")
-    print("  d      内置示例预览")
-    print("  c      清空预览缓存")
-    print("  s      查看当前状态")
-    print("  r      重新加载 config.json")
-    print("  q      退出程序")
-    print("  ?      显示帮助")
-    print("-" * 42)
+    print("\t窗口命令有下面这些喵~\n")
+    print("\tm        开关猫娘模式")
+    print("\tt        预览剪贴板猫化效果")
+    print("\tt text   预览指定文本")
+    print("\td        内置示例预览")
+    print("\tc        清空预览缓存")
+    print("\ts        查看当前状态")
+    print("\tr        重新加载config.json")
+    print("\tq        退出程序")
+    print("\t?        显示帮助")
+    print("-" * 50)
 
 
 def main() -> None:
@@ -80,7 +80,7 @@ def main() -> None:
     hook.start()
 
     if not resolve_api_key(config.ai):
-        log("⚠ 未配置 API Key，将全部使用规则猫化")
+        log("!!!未配置 API Key，将全部使用规则猫化")
     log("猫娘模式已开启")
 
     stop = threading.Event()
