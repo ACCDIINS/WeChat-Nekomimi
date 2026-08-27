@@ -108,6 +108,22 @@ def test_force_master():
     assert "主人" in transform_rules("好的", cfg)
 
 
+def test_greeting_with_particle_natural_master():
+    """「你好呀」不应变成「你好主人呀哦」。"""
+    cfg = NekomimiConfig(
+        seed=20260827,
+        master_chance=1.0,
+        nya_end_chance=1.0,
+        enable_replacements=False,
+        enable_particles=False,
+    )
+    result = transform_rules("你好呀", cfg)
+    assert "你好主人" not in result
+    assert "主人" in result
+    assert not result.endswith("呀哦")
+    assert result.startswith("主人")
+
+
 def test_load_config_file():
     example = Path(__file__).with_name("config.example.json")
     cfg = load_config(example)
@@ -124,5 +140,6 @@ if __name__ == "__main__":
     test_short_text_uses_rules_with_master()
     test_ai_fallback_to_rules()
     test_force_master()
+    test_greeting_with_particle_natural_master()
     test_load_config_file()
     print("OK")

@@ -1,26 +1,40 @@
 @echo off
-chcp 65001 >nul
+setlocal EnableExtensions
 cd /d "%~dp0"
 
 if not exist "config.json" (
-    echo 未找到 config.json，正在从 config.example.json 复制...
+    if not exist "config.example.json" (
+        echo [ERROR] config.example.json not found.
+        pause
+        exit /b 1
+    )
+    echo Creating config.json from config.example.json ...
     copy /Y "config.example.json" "config.json" >nul
-    echo 请编辑 config.json 填入 ai.api_key 后重新运行。
+    echo Please edit config.json and set ai.api_key, then run again.
     pause
     exit /b 0
 )
 
-if not exist "venv\Scripts\python.exe" (
-    echo 首次运行，正在创建虚拟环境...
-    python -m venv venv
-    call venv\Scripts\activate.bat
-    pip install -r requirements.txt
-) else (
-    call venv\Scripts\activate.bat
+where python >nul 2>&1
+if errorlevel 1 (
+    echo [ERROR] Python not found. Install Python 3.10+ and add to PATH.
+    pause
+    exit /b 1
 )
 
-echo 若改写不生效或重复发送，请右键「以管理员身份运行」此脚本。
-echo API Key 请配置在 config.json 或环境变量 NEKOMIMI_API_KEY 中。
-echo.
-python main.py
+if not exist "venv\Scripts\python.exe" (
+    echo Creating virtual environment ...
+    python -m venv venv
+    if errorlevel 1 (
+        echo [ERROR] Failed to create venv.
+        pause
+        exit /b 1
+    )
+)
+
+call "venv\Scripts\activate.bat"
+"venv\Scripts\python.exe" -m pip install -q --disable-pip-version-check -r requirements.txt
+
+"venv\Scripts\python.exe" main.py
 pause
+endlocal

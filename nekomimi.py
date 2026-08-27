@@ -16,7 +16,9 @@ Mode = Literal["punctuation", "always"]
 
 END_PUNCT = "。！？!?~～…"
 TRAILING_PUNCT = re.compile(r"([。！？!?~～…]+)$")
-DEFAULT_SUFFIXES = ("喵", "～喵", "喵～", "喵！", "哦")
+DEFAULT_SUFFIXES = ("喵", "～喵", "喵～", "喵！")
+# 句末已有这些语气词时不再叠后缀（避免「你好呀哦」）
+CUTE_ENDINGS = ("喵", "～", "~", "呀", "哦", "呢", "嘛", "啦", "哒", "呐", "哇", "哈")
 
 DEFAULT_REPLACEMENTS: tuple[dict[str, object], ...] = (
     {"from": "为什么", "to": "为什么呀", "chance": 0.55, "once": True},
@@ -149,8 +151,14 @@ def _insert_master(text: str, chance: float, rng: random.Random) -> str:
         phrase_list = list(phrases)
         rng.shuffle(phrase_list)
         for src, dst in phrase_list:
-            if src in text and dst not in text:
-                return text.replace(src, dst, 1)
+            idx = text.find(src)
+            if idx == -1 or dst in text:
+                continue
+            rest = text[idx + len(src) :].lstrip()
+            # 短语后还有正文（如「你好呀」）→ 用前缀，避免「你好主人呀」
+            if rest and rest[0] not in END_PUNCT and rest[0] not in "，,、；;：:":
+                return rng.choice(("主人，", "主人~")) + text
+            return text.replace(src, dst, 1)
         m = TRAILING_PUNCT.search(text)
         if m:
             punct = m.group(1)
@@ -192,7 +200,7 @@ def _append_nya_to_clause(clause: str, chance: float, config: NekomimiConfig, rn
         return clause
 
     core = clause.rstrip()
-    if not core or core.endswith("喵") or core.endswith("～"):
+    if not core or core.endswith(CUTE_ENDINGS):
         return clause
 
     trailing_ws = clause[len(core) :]

@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import sys
 import threading
+import unicodedata
 from datetime import datetime
 from pathlib import Path
 
@@ -17,12 +18,34 @@ from app_config import TRANSFORM_CACHE, load_config, preview_samples, transform
 from hook import WeChatCatHook
 
 CONFIG_PATH = Path(__file__).with_name("config.json")
+_BANNER_INNER_WIDTH = 38
 
-BANNER = r"""
-  ╭──────────────────────────────────────╮
-  │   微信猫娘助手    Nekomimi for WeChat  │
-  ╰──────────────────────────────────────╯
-"""
+
+def _display_width(text: str) -> int:
+    """终端显示宽度（中文等宽字符计 2）。"""
+    width = 0
+    for ch in text:
+        width += 2 if unicodedata.east_asian_width(ch) in ("F", "W") else 1
+    return width
+
+
+def _pad_center(text: str, inner_width: int) -> str:
+    gap = inner_width - _display_width(text)
+    if gap <= 0:
+        return text
+    left = gap // 2
+    return " " * left + text + " " * (gap - left)
+
+
+def _print_banner() -> None:
+    bar = "─" * _BANNER_INNER_WIDTH
+    lines = ("微信猫娘助手", "Nekomimi for WeChat")
+    print()
+    print(f"  ╭{bar}╮")
+    for line in lines:
+        print(f"  │{_pad_center(line, _BANNER_INNER_WIDTH)}│")
+    print(f"  ╰{bar}╯")
+    print()
 
 
 def log(msg: str) -> None:
@@ -45,7 +68,7 @@ def _print_help() -> None:
 
 
 def main() -> None:
-    print(BANNER)
+    _print_banner()
     _print_help()
     print("用法: 微信输入后按 Enter 发送 → 自动加主人/喵")
     print("说明: 短句走本地规则，超过 22 字或偶尔抽样才调 AI")

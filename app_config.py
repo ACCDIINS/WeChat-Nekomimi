@@ -18,7 +18,7 @@ from typing import Callable
 from ai_engine import AiConfig, resolve_api_key, transform_ai
 from nekomimi import NekomimiConfig, _default_replacements, _should_skip, transform as transform_rules
 
-DEFAULT_SUFFIXES = ("喵", "～喵", "喵～", "喵！", "哦")
+DEFAULT_SUFFIXES = ("喵", "～喵", "喵～", "喵！")
 
 
 class TransformCache:
