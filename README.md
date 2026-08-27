@@ -133,7 +133,7 @@ venv\Scripts\python test_nekomimi.py
 
 ## 许可证
 
-[MIT](LICENSE)
+[MIT](LICENSE) · 作者 [@ACCDIINS](https://github.com/ACCDIINS)
 
 ---
 
