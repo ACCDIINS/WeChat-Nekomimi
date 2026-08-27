@@ -1,0 +1,52 @@
+{
+  "ai": {
+    "api_key": "",
+    "base_url": "https://api.deepseek.com",
+    "model": "deepseek-chat",
+    "timeout": 20,
+    "temperature": 0.75,
+    "fallback_to_rules": true,
+    "system_prompt": "",
+    "use_ai_chance": 0.12,
+    "min_length_for_ai": 22
+  },
+  "master_chance": 0.72,
+  "nya_end_chance": 0.78,
+  "nya_per_sentence_chance": 0.55,
+  "cute_particle_chance": 0.22,
+  "add_trailing_wave_chance": 0.2,
+  "enable_master": true,
+  "enable_nya": true,
+  "enable_replacements": true,
+  "enable_particles": true,
+  "force_master": true,
+  "suffix_templates": [
+    "喵",
+    "～喵",
+    "喵～",
+    "喵！",
+    "哦"
+  ],
+  "replacements": [
+    { "from": "为什么", "to": "为什么呀", "chance": 0.55, "once": true },
+    { "from": "什么", "to": "什么呀", "chance": 0.45, "once": true },
+    { "from": "不要", "to": "不要嘛", "chance": 0.45, "once": true },
+    { "from": "可以吗", "to": "可以嘛", "chance": 0.5, "once": true },
+    { "from": "好不好", "to": "好嘛", "chance": 0.45, "once": true },
+    { "from": "好的", "to": "好哒", "chance": 0.4, "once": true },
+    { "from": "好吧", "to": "好嘛", "chance": 0.4, "once": true },
+    { "from": "没有", "to": "没有啦", "chance": 0.35, "once": true },
+    { "from": "不知道", "to": "不知道啦", "chance": 0.35, "once": true },
+    { "from": "我", "to": "人家", "chance": 0.28, "once": true },
+    { "from": "你", "to": "主人", "chance": 0.12, "once": true },
+    { "from": "嗯", "to": "嗯嗯", "chance": 0.25, "once": true },
+    { "from": "哦", "to": "哦～", "chance": 0.2, "once": true },
+    { "from": "啥", "to": "啥子", "chance": 0.3, "once": true }
+  ],
+  "_comment_providers": {
+    "DeepSeek": { "base_url": "https://api.deepseek.com", "model": "deepseek-chat" },
+    "Kimi": { "base_url": "https://api.moonshot.cn/v1", "model": "moonshot-v1-8k" },
+    "通义千问": { "base_url": "https://dashscope.aliyuncs.com/compatible-mode/v1", "model": "qwen-turbo" },
+    "OpenAI": { "base_url": "https://api.openai.com/v1", "model": "gpt-4o-mini" }
+  }
+}
